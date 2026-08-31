@@ -122,37 +122,54 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
     levels: set[float] = set()
 
     placemarks = root.findall(".//kml:Placemark", NSMAP)
+    if not placemarks:
+        # Namespace-agnostic fallback for KML files without standard namespace declarations
+        placemarks = root.xpath(".//*[local-name()='Placemark']")
+
     for pm in placemarks:
-        elevation = _extract_elevation(pm)
-        if elevation is None:
-            continue
+        pm_elevation = _extract_elevation(pm)
 
         line_strings = pm.findall(".//kml:LineString", NSMAP)
         if not line_strings:
-            # Some contour exports use MultiGeometry -> LineString already
-            # covered by the .// search above; if truly absent, skip.
+            line_strings = pm.xpath(".//*[local-name()='LineString']")
+        if not line_strings:
             continue
 
         for ls in line_strings:
             coords_el = ls.find("kml:coordinates", NSMAP)
+            if coords_el is None:
+                coords_els = ls.xpath(".//*[local-name()='coordinates']")
+                coords_el = coords_els[0] if coords_els else None
             if coords_el is None or not coords_el.text:
                 continue
-            n_lines += 1
-            levels.add(elevation)
+
             for token in coords_el.text.split():
                 parts = token.split(",")
                 if len(parts) < 2:
                     continue
-                lon, lat = float(parts[0]), float(parts[1])
+                try:
+                    lon, lat = float(parts[0]), float(parts[1])
+                    # If placemark elevation was not found, check 3D coordinate Z value
+                    elevation = pm_elevation
+                    if elevation is None and len(parts) >= 3:
+                        elevation = float(parts[2])
+                    if elevation is None:
+                        continue
+                except ValueError:
+                    continue
+
                 lons.append(lon)
                 lats.append(lat)
                 elevs.append(elevation)
+                levels.add(elevation)
+
+            n_lines += 1
 
     if not lons:
         raise ValueError(
             "No usable contour coordinates found in the uploaded file. "
             "Expected Placemark/LineString elements with an elevation "
-            "value in <name>, <ExtendedData>, or <description>."
+            "value in <name>, <ExtendedData>, <description>, or 3D coordinate Z values."
         )
 
     return ContourPointCloud(
@@ -162,3 +179,4 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
         n_lines=n_lines,
         elevation_levels=sorted(levels),
     )
+

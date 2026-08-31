@@ -131,13 +131,15 @@ def find_pour_point(
     """
     rows, cols = dem.shape
     total_cells = rows * cols
-    min_cells = max(int(total_cells * min_catchment_fraction), 10)
+    min_cells = max(int(total_cells * min_catchment_fraction), 1)
 
-    margin_r = max(int(rows * edge_margin_fraction), 2)
-    margin_c = max(int(cols * edge_margin_fraction), 2)
+    margin_r = min(max(int(rows * edge_margin_fraction), 1), max(0, (rows // 2) - 1))
+    margin_c = min(max(int(cols * edge_margin_fraction), 1), max(0, (cols // 2) - 1))
 
     interior = np.zeros((rows, cols), dtype=bool)
     interior[margin_r: rows - margin_r, margin_c: cols - margin_c] = True
+    if not interior.any():
+        interior = np.ones((rows, cols), dtype=bool)
 
     is_pit = flow.direction == PIT
     candidates = is_pit & interior & (flow.accumulation >= min_cells)
@@ -149,16 +151,21 @@ def find_pour_point(
             candidates = off_river_candidates
 
     if not candidates.any():
-        # Fallback if no off-river candidate pit is found
+        # Fallback 1: Relax min_cells constraint but keep interior pits
         candidates = is_pit & interior
         if not candidates.any():
-            masked = np.where(interior, flow.accumulation, -1)
-            r, c = np.unravel_index(np.argmax(masked), masked.shape)
-            return int(r), int(c)
+            # Fallback 2: Any pit anywhere
+            candidates = is_pit
+            if not candidates.any():
+                # Fallback 3: Interior cell with highest accumulation
+                masked = np.where(interior, flow.accumulation, -1)
+                r, c = np.unravel_index(np.argmax(masked), masked.shape)
+                return int(r), int(c)
 
     masked_acc = np.where(candidates, flow.accumulation, -1)
     r, c = np.unravel_index(np.argmax(masked_acc), masked_acc.shape)
     return int(r), int(c)
+
 
 
 

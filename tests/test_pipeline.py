@@ -97,3 +97,31 @@ def test_avoid_main_river_option():
     # The main river outlet will have a larger accumulation than an off-river tributary
     assert res_river.catchment["cell_count"] > res_off_river.catchment["cell_count"]
 
+
+def test_3d_coordinates_kml_parsing():
+    """Test edge case KML with 3D coordinates (lon,lat,z) and no placemark elevation name."""
+    kml = b'''<?xml version="1.0" encoding="UTF-8"?>
+    <kml xmlns="http://www.opengis.net/kml/2.2">
+      <Document>
+        <Placemark>
+          <LineString>
+            <coordinates>
+              81.29,21.25,280.0 81.30,21.25,280.0 81.31,21.25,280.0
+            </coordinates>
+          </LineString>
+        </Placemark>
+        <Placemark>
+          <LineString>
+            <coordinates>
+              81.29,21.26,290.0 81.30,21.26,290.0 81.31,21.26,290.0
+            </coordinates>
+          </LineString>
+        </Placemark>
+      </Document>
+    </kml>'''
+    pc = parse_contours(kml)
+    assert len(pc.elevation_levels) == 2
+    assert 280.0 in pc.elevation_levels
+    assert 290.0 in pc.elevation_levels
+
+
