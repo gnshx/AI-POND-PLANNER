@@ -60,15 +60,12 @@ KML/KMZ upload
   on numpy arrays with no heavy GIS dependency, which matters for the
   RAM budget (see §3).
 
-- **Pond siting = largest interior sink.** A pond needs a bowl: a local
-  low point that water naturally collects in. We compute flow
-  accumulation (how many upstream cells drain through each cell) and then
-  look only at *interior* local minima — a cell with high accumulation
-  right at the map edge is usually just water leaving the tile, not a
-  real basin. Among genuine interior sinks, the one with the largest
-  contributing area is both the best water-collection site and gives the
-  most useful pond for storage purposes. This is a **data-driven proxy**,
-  not a full siting study — see §4 (limitations).
+- **Pond siting = optimal off-stream interior sink.** A pond needs a bowl: a local
+  low point that water naturally collects in, while avoiding primary river beds/channels.
+  We compute flow accumulation (how many upstream cells drain through each cell) and look
+  for interior topographic sinks. Crucially, main river channels (where flow accumulation
+  reaches the primary river trunk) are filtered out so the pond is placed on a suitable
+  sub-catchment or tributary basin rather than directly obstructing a main river channel.
 
 - **Catchment = everything that drains to that point.** Once the pond
   site (pour point) is fixed, its catchment is exactly the set of cells
@@ -79,7 +76,7 @@ KML/KMZ upload
   grid extent, cell size, pond location, catchment area, elevation
   range — is derived at request time from whatever file is uploaded. The
   only tunable parameters are generic knobs (target DEM resolution,
-  minimum candidate-basin size), not anything specific to this sample map.
+  minimum candidate-basin size, main river avoidance thresholds), not anything specific to this sample map.
 
 ### 1.3 Generalising to Phase 3
 
@@ -114,7 +111,9 @@ Accepts a contour map and returns pond + catchment information.
 |---------------------------|--------|----------|----------------------------------------------------------------------|
 | `file`                    | file   | yes      | `.kml` or `.kmz` contour map                                        |
 | `target_cells` (query)    | int    | no       | DEM grid resolution (cells). Default `250000`. Range `10000–600000`. |
-| `min_catchment_fraction` (query) | float | no | Minimum candidate basin size as a fraction of DEM extent. Default `0.01`. |
+| `min_catchment_fraction` (query) | float | no | Minimum candidate basin size as a fraction of DEM extent. Default `0.005`. |
+| `max_river_fraction` (query) | float | no | Max accumulation threshold before a channel is flagged as main river. Default `0.35`. |
+| `avoid_main_river` (query) | bool | no | If `true`, avoids placing pond sites directly on main river channels. Default `true`. |
 
 **Example:**
 
@@ -128,18 +127,18 @@ curl -X POST "http://<host>:8000/analyzeContour" \
 ```json
 {
   "pond_location": {
-    "longitude": 81.2900958,
-    "latitude": 21.2499223,
-    "elevation_m": 267.0,
-    "selection_method": "Interior topographic sink (D8 local minimum) with the largest upstream contributing area among candidate sinks."
+    "longitude": 81.2886285,
+    "latitude": 21.2526051,
+    "elevation_m": 269.01,
+    "selection_method": "Off-stream interior topographic sink / sub-catchment pour point with optimal contributing area, avoiding main river channels."
   },
   "catchment": {
-    "area_m2": 141953.1,
-    "area_hectares": 14.195,
-    "cell_count": 4149,
+    "area_m2": 49610.0,
+    "area_hectares": 4.961,
+    "cell_count": 1450,
     "cell_size_m": 5.849,
-    "elevation_range_m": [267.0, 286.0],
-    "relief_m": 19.0,
+    "elevation_range_m": [269.01, 287.99],
+    "relief_m": 18.98,
     "boundary_polygon": { "type": "Polygon", "coordinates": [ [ [lon, lat], ... ] ] }
   },
   "dem_summary": {

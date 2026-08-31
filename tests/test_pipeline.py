@@ -84,3 +84,16 @@ def test_analyze_is_deterministic():
     r2 = analyze(data, target_cells=40_000)
     assert r1.pond_location == r2.pond_location
     assert r1.catchment["cell_count"] == r2.catchment["cell_count"]
+
+
+def test_avoid_main_river_option():
+    data = _sample_bytes()
+    # When avoid_main_river=False, pour point is on the main river channel (max accumulation)
+    res_river = analyze(data, target_cells=40_000, avoid_main_river=False)
+    # When avoid_main_river=True (default), pour point is on a suitable tributary/off-river basin
+    res_off_river = analyze(data, target_cells=40_000, avoid_main_river=True)
+
+    assert res_river.pond_location != res_off_river.pond_location
+    # The main river outlet will have a larger accumulation than an off-river tributary
+    assert res_river.catchment["cell_count"] > res_off_river.catchment["cell_count"]
+

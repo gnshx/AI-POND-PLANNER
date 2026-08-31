@@ -118,32 +118,49 @@ def build_flow_model(dem: np.ndarray, cell_size_m: float) -> FlowModel:
 def find_pour_point(
     flow: FlowModel,
     dem: np.ndarray,
-    min_catchment_fraction: float = 0.01,
-    edge_margin: int = 1,
+    min_catchment_fraction: float = 0.005,
+    max_river_fraction: float = 0.35,
+    avoid_main_river: bool = True,
+    edge_margin_fraction: float = 0.03,
 ) -> tuple[int, int]:
     """
-    Choose the most promising pond / outlet location: the interior local
-    minimum (topographic sink) with the largest contributing (upstream)
-    area, i.e. the pit that would collect runoff from the biggest natural
-    catchment. Boundary cells are excluded because "flow accumulation"
-    there is an artefact of the DEM simply ending, not a real basin.
+    Choose a suitable off-stream pond / outlet location:
+    Identifies interior topographic sinks or tributary pour points with a
+    viable catchment area while avoiding main river channels (where high flow
+    accumulation indicates a primary river bed or major stream).
     """
     rows, cols = dem.shape
     total_cells = rows * cols
     min_cells = max(int(total_cells * min_catchment_fraction), 5)
 
+    margin_r = max(int(rows * edge_margin_fraction), 2)
+    margin_c = max(int(cols * edge_margin_fraction), 2)
+
     interior = np.zeros((rows, cols), dtype=bool)
-    interior[edge_margin: rows - edge_margin, edge_margin: cols - edge_margin] = True
+    interior[margin_r: rows - margin_r, margin_c: cols - margin_c] = True
 
     is_pit = flow.direction == PIT
     candidates = is_pit & interior & (flow.accumulation >= min_cells)
 
+    max_acc = flow.accumulation.max()
+
+    if avoid_main_river and max_acc > 0:
+        # Main river channel threshold: exclude cells carrying primary river flow
+        river_cutoff = max_acc * max_river_fraction
+        off_river_candidates = candidates & (flow.accumulation < river_cutoff)
+        if off_river_candidates.any():
+            candidates = off_river_candidates
+
     if not candidates.any():
-        # Fall back: relax the minimum-size threshold rather than fail.
+        # Fall back 1: relax min_cells but keep river avoidance if possible
         candidates = is_pit & interior
+        if avoid_main_river and max_acc > 0:
+            off_river = candidates & (flow.accumulation < max_acc * max_river_fraction)
+            if off_river.any():
+                candidates = off_river
+
         if not candidates.any():
-            # No interior pit at all (very unusual) - use the interior cell
-            # with the single highest accumulation as a last resort.
+            # Fall back 2: interior cell with highest accumulation
             masked = np.where(interior, flow.accumulation, -1)
             r, c = np.unravel_index(np.argmax(masked), masked.shape)
             return int(r), int(c)
@@ -151,6 +168,7 @@ def find_pour_point(
     masked_acc = np.where(candidates, flow.accumulation, -1)
     r, c = np.unravel_index(np.argmax(masked_acc), masked_acc.shape)
     return int(r), int(c)
+
 
 
 def delineate_catchment(flow: FlowModel, outlet: tuple[int, int]) -> np.ndarray:

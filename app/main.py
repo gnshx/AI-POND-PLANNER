@@ -72,10 +72,20 @@ async def analyze_contour(
         description="DEM grid resolution (total cells); lower = faster/less RAM.",
     ),
     min_catchment_fraction: float = Query(
-        0.01,
+        0.005,
         ge=0.0,
         le=0.5,
         description="Minimum candidate basin size, as a fraction of the DEM extent.",
+    ),
+    max_river_fraction: float = Query(
+        0.35,
+        ge=0.01,
+        le=1.0,
+        description="Maximum accumulation fraction before a channel is considered a main river to avoid.",
+    ),
+    avoid_main_river: bool = Query(
+        True,
+        description="Avoid placing pond sites directly on main river channels.",
     ),
 ):
     filename = (file.filename or "").lower()
@@ -99,6 +109,8 @@ async def analyze_contour(
             file_bytes,
             target_cells=target_cells,
             min_catchment_fraction=min_catchment_fraction,
+            max_river_fraction=max_river_fraction,
+            avoid_main_river=avoid_main_river,
         )
     except ValueError as e:
         logger.warning("Bad contour input: %s", e)

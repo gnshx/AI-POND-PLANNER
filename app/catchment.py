@@ -48,7 +48,9 @@ def _boundary_polygon(dem: DEM, mask: np.ndarray) -> list[list[float]]:
 def analyze(
     file_bytes: bytes,
     target_cells: int = 250_000,
-    min_catchment_fraction: float = 0.01,
+    min_catchment_fraction: float = 0.005,
+    max_river_fraction: float = 0.35,
+    avoid_main_river: bool = True,
 ) -> CatchmentResult:
     warnings: list[str] = []
 
@@ -57,7 +59,11 @@ def analyze(
 
     flow = hydrology.build_flow_model(dem.elevation, dem.cell_size_m)
     outlet_rc = hydrology.find_pour_point(
-        flow, dem.elevation, min_catchment_fraction=min_catchment_fraction
+        flow,
+        dem.elevation,
+        min_catchment_fraction=min_catchment_fraction,
+        max_river_fraction=max_river_fraction,
+        avoid_main_river=avoid_main_river,
     )
     mask = hydrology.delineate_catchment(flow, outlet_rc)
 
@@ -86,8 +92,8 @@ def analyze(
             "latitude": round(float(outlet_lat), 7),
             "elevation_m": round(outlet_elev, 2),
             "selection_method": (
-                "Interior topographic sink (D8 local minimum) with the "
-                "largest upstream contributing area among candidate sinks."
+                "Off-stream interior topographic sink / sub-catchment pour point "
+                "with optimal contributing area, avoiding main river channels."
             ),
         },
         catchment={
