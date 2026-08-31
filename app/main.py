@@ -72,16 +72,16 @@ async def analyze_contour(
         description="DEM grid resolution (total cells); lower = faster/less RAM.",
     ),
     min_catchment_fraction: float = Query(
-        0.005,
+        0.0001,
         ge=0.0,
         le=0.5,
         description="Minimum candidate basin size, as a fraction of the DEM extent.",
     ),
     max_river_fraction: float = Query(
-        0.35,
-        ge=0.01,
+        0.0015,
+        ge=0.0001,
         le=1.0,
-        description="Maximum accumulation fraction before a channel is considered a main river to avoid.",
+        description="Maximum accumulation fraction before a channel is considered a river or stream to avoid.",
     ),
     avoid_main_river: bool = Query(
         True,

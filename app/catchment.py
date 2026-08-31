@@ -48,8 +48,8 @@ def _boundary_polygon(dem: DEM, mask: np.ndarray) -> list[list[float]]:
 def analyze(
     file_bytes: bytes,
     target_cells: int = 250_000,
-    min_catchment_fraction: float = 0.005,
-    max_river_fraction: float = 0.35,
+    min_catchment_fraction: float = 0.0001,
+    max_river_fraction: float = 0.0015,
     avoid_main_river: bool = True,
 ) -> CatchmentResult:
     warnings: list[str] = []
