@@ -302,15 +302,19 @@ def main():
     add_p("The API was tested using the provided contour map and Postman/cURL requests. The following screenshots provide evidence of the implementation and testing.")
 
     # Helper for adding image figures
-    def add_figure(img_name, caption, fig_num):
-        img_path = IMG_DIR / img_name
+    def add_figure(img_input, caption, fig_num):
+        if isinstance(img_input, Path):
+            img_path = img_input
+        else:
+            img_path = IMG_DIR / img_input
+
         if img_path.exists():
             p_img = doc.add_paragraph()
             p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p_img.paragraph_format.space_before = Pt(8)
             p_img.paragraph_format.space_after = Pt(4)
             run = p_img.add_run()
-            run.add_picture(str(img_path), width=Inches(5.8))
+            run.add_picture(str(img_path), width=Inches(6.0))
             
             p_cap = doc.add_paragraph()
             p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -320,7 +324,7 @@ def main():
             r_cap.font.italic = True
             r_cap.font.color.rgb = RGBColor(0x4B, 0x55, 0x63)
         else:
-            add_p(f"[Image file {img_name} not found]")
+            add_p(f"[Image file {img_path} not found]")
 
     # 10.1 Health Check
     add_h2("10.1 Health Check")
@@ -349,6 +353,13 @@ def main():
     add_bullet("Live API Base URL: http://10.1.75.51:4310/")
     add_bullet("Swagger Documentation: http://10.1.75.51:4310/docs")
     add_bullet("Health Check: http://10.1.75.51:4310/health")
+
+    # 10.5 Terrain Visualization & Catchment Mapping
+    add_h2("10.5 Terrain Visualization & Catchment Mapping")
+    add_p("The system generates a 3-panel visualization figure illustrating the reconstructed Digital Elevation Model (DEM), flow accumulation channels, and the delineated catchment area along with the selected pond pour point.")
+    demo_img_path = Path("/home/ganesh/Desktop/csd/AI-POND-PLANNER/docs/demo_output.png")
+    add_figure(demo_img_path, "3-Panel DEM, Flow Accumulation, and Catchment Delineation Visual Map", 5)
+
 
     # 11. Project Structure
     add_h1("11. Project Structure")
