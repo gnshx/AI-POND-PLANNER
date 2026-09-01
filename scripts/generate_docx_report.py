@@ -360,6 +360,12 @@ def main():
     demo_img_path = Path("/home/ganesh/Desktop/csd/AI-POND-PLANNER/docs/demo_output.png")
     add_figure(demo_img_path, "3-Panel DEM, Flow Accumulation, and Catchment Delineation Visual Map", 5)
 
+    # 10.6 Interactive Swagger API Documentation UI
+    add_h2("10.6 Interactive Swagger API Documentation UI")
+    add_p("The FastAPI interactive Swagger UI docs interface was tested directly at http://10.1.75.51:4310/docs to verify parameter inputs and multipart form-data specification for contour_map.")
+    swagger_img_path = Path("/home/ganesh/Desktop/csd/AI-POND PLANNER REPORT/phase2-backend/swagger-docs.png")
+    add_figure(swagger_img_path, "FastAPI Interactive Swagger UI Documentation (/docs)", 6)
+
 
     # 11. Project Structure
     add_h1("11. Project Structure")
@@ -374,9 +380,12 @@ def main():
 │   └── catchment.py
 │
 ├── scripts/
-│   └── demo_plot.py
+│   ├── demo_plot.py
+│   └── generate_docx_report.py
 │
 ├── docs/
+│   ├── demo_output.png
+│   ├── swagger-docs.png
 │   └── response.json
 │
 ├── requirements.txt
@@ -462,8 +471,20 @@ def main():
     add_p("For the provided sample contour map, the system identified a pond location at approximately 81.2886285°E, 21.2526051°N, with an estimated catchment area of 49,610 m² (4.961 hectares).")
     add_p("The API was tested using the deployed backend and Postman, with the results stored in the provided JSON response. The modular implementation also provides a foundation for using different contour maps and extending the system in future phases.")
 
+    # 16. Acknowledgements & AI Assistance Statement
+    add_h1("16. Acknowledgements & AI Assistance Statement")
+    add_p("Taken help from Gemini AI in designing system architecture, refining hydrological flow-routing algorithms, compiling report documentation, and creating comprehensive unit and integration test suites.")
+
     doc.save(OUTPUT_DOCX)
     print(f"Report successfully saved to {OUTPUT_DOCX}")
+
+    # Convert DOCX to PDF using LibreOffice
+    import subprocess
+    output_pdf = OUTPUT_DOCX.with_suffix('.pdf')
+    print("Converting DOCX to PDF via LibreOffice...")
+    cmd = ["libreoffice", "--headless", "--convert-to", "pdf", str(OUTPUT_DOCX), "--outdir", str(OUTPUT_DOCX.parent)]
+    subprocess.run(cmd, check=True)
+    print(f"PDF successfully generated at {output_pdf}")
 
 
 if __name__ == "__main__":
