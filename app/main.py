@@ -11,7 +11,7 @@ POST /analyzeContour
                                         fraction of DEM extent (default 0.01)
 
 Run locally:
-    uvicorn app.main:app --host 0.0.0.0 --port 8000
+    uvicorn app.main:app --host 0.0.0.0 --port 4000
 
 Memory footprint is intentionally bounded (see app/dem.py) to run
 comfortably on small (~2GB RAM) hosts; see README.md for deployment notes.

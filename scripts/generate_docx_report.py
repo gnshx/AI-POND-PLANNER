@@ -394,9 +394,9 @@ def main():
     # 12. Running the Project Locally
     add_h1("12. Running the Project Locally")
     add_p("The project can be run locally using Python and Uvicorn.")
-    add_code_block(doc, "python3 -m venv venv\nsource venv/bin/activate\npip install -r requirements.txt\nuvicorn app.main:app --host 0.0.0.0 --port 8000")
+    add_code_block(doc, "python3 -m venv venv\nsource venv/bin/activate\npip install -r requirements.txt\nuvicorn app.main:app --host 0.0.0.0 --port 4000")
     add_p("After starting the server, the API documentation can be accessed through:")
-    add_code_block(doc, "http://localhost:8000/docs")
+    add_code_block(doc, "http://localhost:4000/docs")
     add_p("The main analysis endpoint is:")
     add_code_block(doc, "POST /analyzeContour")
 
