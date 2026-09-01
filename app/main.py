@@ -41,7 +41,7 @@ app = FastAPI(
 )
 
 ALLOWED_EXTENSIONS = (".kml", ".kmz")
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB - generous for contour KML/KMZ
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100MB - generous for contour KML/KMZ
 
 
 @app.get("/")
