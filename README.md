@@ -101,25 +101,30 @@ differently-produced) contour map should work with no code changes:
 
 ## 2. API Documentation
 
-### `POST /analyzeContour`
+### `POST /analyzeContour` or `POST /findCatchment`
 
-Accepts a contour map and returns pond + catchment information.
+Accepts a contour map (KML/KMZ) and returns pond + catchment information.
 
 **Request:** `multipart/form-data`
 
 | Field                     | Type   | Required | Description                                                        |
 |---------------------------|--------|----------|----------------------------------------------------------------------|
-| `file`                    | file   | yes      | `.kml` or `.kmz` contour map                                        |
+| `contour_map` (or `file`) | file   | yes      | `.kml` or `.kmz` contour map file                                     |
 | `target_cells` (query)    | int    | no       | DEM grid resolution (cells). Default `250000`. Range `10000–600000`. |
-| `min_catchment_fraction` (query) | float | no | Minimum candidate basin size as a fraction of DEM extent. Default `0.005`. |
-| `max_river_fraction` (query) | float | no | Max accumulation threshold before a channel is flagged as main river. Default `0.35`. |
+| `min_catchment_fraction` (query) | float | no | Minimum candidate basin size as a fraction of DEM extent. Default `0.0001`. |
+| `max_river_fraction` (query) | float | no | Max accumulation threshold before a channel is flagged as main river. Default `0.0015`. |
 | `avoid_main_river` (query) | bool | no | If `true`, avoids placing pond sites directly on main river channels. Default `true`. |
 
 **Example:**
 
 ```bash
+# Uploading via standard TA required field name 'contour_map':
 curl -X POST "http://<host>:8000/analyzeContour" \
-  -F "file=@contours_1m.kml"
+  -F "contour_map=@contours_1m.kml"
+
+# Alternative alias route:
+curl -X POST "http://<host>:8000/findCatchment" \
+  -F "contour_map=@contours_1m.kml"
 ```
 
 **Response `200 OK`:**

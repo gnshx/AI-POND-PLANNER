@@ -63,8 +63,14 @@ def health():
 
 
 @app.post("/analyzeContour")
+@app.post("/findCatchment")
 async def analyze_contour(
-    file: UploadFile = File(..., description="KML or KMZ contour map"),
+    contour_map: UploadFile | None = File(
+        None, description="KML or KMZ contour map (form field: contour_map)"
+    ),
+    file: UploadFile | None = File(
+        None, description="KML or KMZ contour map (form field: file)"
+    ),
     target_cells: int = Query(
         DEFAULT_TARGET_CELLS,
         ge=MIN_TARGET_CELLS,
@@ -88,14 +94,21 @@ async def analyze_contour(
         description="Avoid placing pond sites directly on main river channels.",
     ),
 ):
-    filename = (file.filename or "").lower()
+    upload_file = contour_map or file
+    if upload_file is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Missing contour map file. Upload a KML/KMZ file using form field 'contour_map' or 'file'.",
+        )
+
+    filename = (upload_file.filename or "").lower()
     if not filename.endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type. Expected one of {ALLOWED_EXTENSIONS}.",
         )
 
-    file_bytes = await file.read()
+    file_bytes = await upload_file.read()
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     if len(file_bytes) > MAX_UPLOAD_BYTES:
