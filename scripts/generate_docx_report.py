@@ -85,10 +85,11 @@ def main():
     sub_run.font.color.rgb = RGBColor(0x25, 0x63, 0xEB)
 
     # Metadata Card / Table
-    meta_table = doc.add_table(rows=3, cols=2)
+    meta_table = doc.add_table(rows=4, cols=2)
     meta_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     meta_data = [
-        ("Submitted By:", "Shivam Kushwaha / Ganesh"),
+        ("Name:", "Ganesh"),
+        ("ID:", "12341500"),
         ("GitHub Repository:", "https://github.com/gnshx/AI-POND-PLANNER"),
         ("Live API URL:", "http://10.1.75.51:4310/analyzeContour")
     ]
@@ -405,7 +406,7 @@ def main():
     add_p("The project can be run locally using Python and Uvicorn.")
     add_code_block(doc, "python3 -m venv venv\nsource venv/bin/activate\npip install -r requirements.txt\nuvicorn app.main:app --host 0.0.0.0 --port 4000")
     add_p("After starting the server, the API documentation can be accessed through:")
-    add_code_block(doc, "http://localhost:4000/docs")
+    add_code_block(doc, "http://10.1.75.51:4310/docs")
     add_p("The main analysis endpoint is:")
     add_code_block(doc, "POST /analyzeContour")
 
@@ -473,7 +474,7 @@ def main():
 
     # 16. Acknowledgements & AI Assistance Statement
     add_h1("16. Acknowledgements & AI Assistance Statement")
-    add_p("Taken help from Gemini AI in designing system architecture, refining hydrological flow-routing algorithms, compiling report documentation, and creating comprehensive unit and integration test suites.")
+    add_p("Taken help from Gemini AI in designing system architecture, refining hydrological flow-routing algorithms.")
 
     doc.save(OUTPUT_DOCX)
     print(f"Report successfully saved to {OUTPUT_DOCX}")
