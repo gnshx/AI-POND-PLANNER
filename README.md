@@ -7,8 +7,8 @@ from it, identifies a suitable pond location, and estimates the catchment
 (drainage) area feeding that location — entirely derived from the uploaded
 file, with nothing hard-coded to the sample map.
 
-> **GitHub repo:** _add your repo URL here after pushing_
-> **Live API URL:** _add your deployed endpoint here, e.g. `http://<your-server-ip>:8000`_
+> **GitHub repo:** `https://github.com/gnshx/AI-POND-PLANNER`
+> **Live API URL:** `http://10.1.75.51:4310/analyzeContour` (or `http://10.1.75.51:4310/findCatchment`)
 
 ---
 
@@ -119,11 +119,11 @@ Accepts a contour map (KML/KMZ) and returns pond + catchment information.
 
 ```bash
 # Uploading via standard TA required field name 'contour_map':
-curl -X POST "http://<host>:8000/analyzeContour" \
+curl -X POST "http://10.1.75.51:4310/analyzeContour" \
   -F "contour_map=@contours_1m.kml"
 
 # Alternative alias route:
-curl -X POST "http://<host>:8000/findCatchment" \
+curl -X POST "http://10.1.75.51:4310/findCatchment" \
   -F "contour_map=@contours_1m.kml"
 ```
 
