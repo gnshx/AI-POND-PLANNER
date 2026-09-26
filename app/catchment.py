@@ -3,24 +3,35 @@ catchment.py
 ------------
 High-level orchestration: KML/KMZ bytes in -> structured catchment
 analysis result out. This is what the API route calls.
+
+Phase 3 additions:
+  - water_volume_m3 estimation using area × estimated average depth.
+  - bbox parameter to clip analysis to a user-selected map region.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional, Tuple
 
 import numpy as np
 from skimage import measure
 
 from . import hydrology
 from .dem import DEM, build_dem
-from .kml_parser import parse_contours
+from .kml_parser import parse_contours, BBox
+
+# Default max pond depth cap used for water volume estimation.
+# Farm ponds are rarely deeper than 3-4 m; capping prevents unrealistic
+# volumes when the contour map has a large relief range.
+DEFAULT_MAX_POND_DEPTH_M = 3.0
 
 
 @dataclass
 class CatchmentResult:
     pond_location: dict
     catchment: dict
+    water_volume: dict
     dem_summary: dict
     input_summary: dict
     warnings: list[str] = field(default_factory=list)
@@ -45,16 +56,80 @@ def _boundary_polygon(dem: DEM, mask: np.ndarray) -> list[list[float]]:
     return ring
 
 
+def _estimate_water_volume(
+    area_m2: float,
+    relief_m: float,
+    max_depth_m: float = DEFAULT_MAX_POND_DEPTH_M,
+) -> dict:
+    """
+    Estimate the water volume a pond at this location could collect.
+
+    Method: The average depth of a simple farm pond is roughly 1/4 of
+    the local relief (the height difference that drives water into the
+    basin), capped at `max_depth_m` to avoid unrealistic values for
+    large, mountainous catchments. The pond is modelled as a bowl whose
+    average cross-section is half the maximum area (triangular profile).
+
+        avg_depth_m  = min(relief_m / 4, max_depth_m)
+        volume_m3    = area_m2 × avg_depth_m × 0.5   (bowl factor)
+
+    This is a planning-level estimate only — actual volume depends on
+    site-specific soil excavation and pond design.
+    """
+    avg_depth_m = min(relief_m / 4.0, max_depth_m)
+    avg_depth_m = max(avg_depth_m, 0.1)  # sanity floor
+
+    # Bowl factor 0.5: average cross-section is half the surface area
+    volume_m3 = area_m2 * avg_depth_m * 0.5
+    volume_liters = volume_m3 * 1_000.0
+    volume_million_liters = volume_liters / 1_000_000.0
+
+    return {
+        "estimated_volume_m3": round(volume_m3, 1),
+        "estimated_volume_liters": round(volume_liters, 0),
+        "estimated_volume_million_liters": round(volume_million_liters, 4),
+        "estimated_avg_depth_m": round(avg_depth_m, 2),
+        "method": (
+            "Terrain-based estimate: avg_depth = min(relief/4, max_depth_cap) "
+            f"= {round(avg_depth_m, 2)} m; "
+            f"volume = area × avg_depth × 0.5 (bowl factor)."
+        ),
+        "note": "Planning-level estimate only. Actual volume depends on site design.",
+    }
+
+
 def analyze(
     file_bytes: bytes,
     target_cells: int = 250_000,
     min_catchment_fraction: float = 0.0001,
     max_river_fraction: float = 0.0015,
     avoid_main_river: bool = True,
+    bbox: Optional[BBox] = None,
+    max_depth_m: float = DEFAULT_MAX_POND_DEPTH_M,
 ) -> CatchmentResult:
+    """
+    Run the full pond catchment analysis pipeline.
+
+    Parameters
+    ----------
+    file_bytes : bytes
+        Raw KML/KMZ bytes.
+    target_cells : int
+        DEM grid resolution knob.
+    min_catchment_fraction : float
+        Minimum fraction of total DEM cells for a valid catchment.
+    max_river_fraction : float
+        Accumulation fraction above which a cell is treated as a main river.
+    avoid_main_river : bool
+        Skip cells on main river/stream channels.
+    bbox : (min_lon, min_lat, max_lon, max_lat) or None
+        Clip contour data to this geographic bounding box (Phase 3 map area).
+    max_depth_m : float
+        Cap for estimated pond depth used in water volume calculation.
+    """
     warnings: list[str] = []
 
-    points = parse_contours(file_bytes)
+    points = parse_contours(file_bytes, bbox_filter=bbox)
     dem = build_dem(points, target_cells=target_cells)
 
     flow = hydrology.build_flow_model(dem.elevation, dem.cell_size_m)
@@ -84,7 +159,10 @@ def analyze(
     outlet_elev = float(dem.elevation[outlet_r, outlet_c])
 
     catchment_elevs = dem.elevation[mask]
+    relief_m = float(catchment_elevs.max() - catchment_elevs.min())
     boundary_ring = _boundary_polygon(dem, mask)
+
+    water_volume = _estimate_water_volume(area_m2, relief_m, max_depth_m)
 
     result = CatchmentResult(
         pond_location={
@@ -105,14 +183,13 @@ def analyze(
                 round(float(catchment_elevs.min()), 2),
                 round(float(catchment_elevs.max()), 2),
             ],
-            "relief_m": round(
-                float(catchment_elevs.max() - catchment_elevs.min()), 2
-            ),
+            "relief_m": round(relief_m, 2),
             "boundary_polygon": {
                 "type": "Polygon",
                 "coordinates": [boundary_ring] if boundary_ring else [],
             },
         },
+        water_volume=water_volume,
         dem_summary={
             "grid_rows": rows,
             "grid_cols": cols,
@@ -130,6 +207,7 @@ def analyze(
                 "max_lon": round(points.bounds[2], 7),
                 "max_lat": round(points.bounds[3], 7),
             },
+            "bbox_filter_applied": bbox is not None,
         },
         warnings=warnings,
     )

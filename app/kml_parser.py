@@ -13,6 +13,8 @@ Design notes (generalisation to Phase 3):
   KML from Phase 3 still has a decent chance of parsing correctly.
 - We deliberately do NOT assume a specific coordinate range, elevation
   range, or number of contour levels - all of that is derived at runtime.
+- Phase 3: added optional bbox_filter=(min_lon, min_lat, max_lon, max_lat)
+  to clip the parsed point cloud to a user-drawn map area.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import io
 import re
 import zipfile
 from dataclasses import dataclass
-from typing import BinaryIO
+from typing import BinaryIO, Optional, Tuple
 
 import numpy as np
 from lxml import etree
@@ -30,6 +32,8 @@ KML_NS = "http://www.opengis.net/kml/2.2"
 NSMAP = {"kml": KML_NS}
 
 _NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+BBox = Tuple[float, float, float, float]  # (min_lon, min_lat, max_lon, max_lat)
 
 
 @dataclass
@@ -97,7 +101,10 @@ def _extract_elevation(placemark: etree._Element) -> float | None:
     return None
 
 
-def parse_contours(file_bytes: bytes) -> ContourPointCloud:
+def parse_contours(
+    file_bytes: bytes,
+    bbox_filter: Optional[BBox] = None,
+) -> ContourPointCloud:
     """
     Parse a KML/KMZ contour map into a flat point cloud.
 
@@ -105,6 +112,16 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
     tagged with the elevation of the contour it belongs to. This is a
     simple, robust way to turn a contour map into scattered 3D data that
     can be interpolated onto a regular elevation grid.
+
+    Parameters
+    ----------
+    file_bytes : bytes
+        Raw bytes of a .kml or .kmz file.
+    bbox_filter : (min_lon, min_lat, max_lon, max_lat) or None
+        When provided, only points that fall inside this geographic bounding
+        box are included. Allows the frontend to restrict analysis to the
+        land area the user drew on the map. Points on the exact boundary
+        are included (≥ min, ≤ max).
     """
     kml_bytes = _load_kml_bytes(file_bytes)
     parser = etree.XMLParser(recover=True, huge_tree=True)
@@ -114,6 +131,11 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
         raise ValueError(f"Could not parse file as XML/KML: {e}")
     if root is None:
         raise ValueError("Could not parse file as XML/KML: no content recovered.")
+
+    # Unpack bbox filter once
+    apply_bbox = bbox_filter is not None
+    if apply_bbox:
+        bmin_lon, bmin_lat, bmax_lon, bmax_lat = bbox_filter
 
     lons: list[float] = []
     lats: list[float] = []
@@ -143,6 +165,7 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
             if coords_el is None or not coords_el.text:
                 continue
 
+            line_had_points = False
             for token in coords_el.text.split():
                 parts = token.split(",")
                 if len(parts) < 2:
@@ -158,14 +181,26 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
                 except ValueError:
                     continue
 
+                # Apply bounding-box filter (Phase 3 map area selection)
+                if apply_bbox:
+                    if not (bmin_lon <= lon <= bmax_lon and bmin_lat <= lat <= bmax_lat):
+                        continue
+
                 lons.append(lon)
                 lats.append(lat)
                 elevs.append(elevation)
                 levels.add(elevation)
+                line_had_points = True
 
-            n_lines += 1
+            if line_had_points:
+                n_lines += 1
 
     if not lons:
+        if apply_bbox:
+            raise ValueError(
+                "No contour data found within the selected map area. "
+                "Try drawing a larger bounding box or uploading a KML that covers the selected region."
+            )
         raise ValueError(
             "No usable contour coordinates found in the uploaded file. "
             "Expected Placemark/LineString elements with an elevation "
@@ -179,4 +214,3 @@ def parse_contours(file_bytes: bytes) -> ContourPointCloud:
         n_lines=n_lines,
         elevation_levels=sorted(levels),
     )
-

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Pond Planner – Catchment Analysis</title>
+  <meta name="description" content="Interactive pond catchment analysis tool. Upload a contour map, select a land area on the map, and get AI-powered pond location, catchment area, and water volume estimates." />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Leaflet Draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" crossorigin="" />
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-base:       #0b0f1a;
+      --bg-card:       #131929;
+      --bg-card2:      #1a2235;
+      --border:        rgba(99,179,237,0.18);
+      --border-hover:  rgba(99,179,237,0.45);
+      --accent-blue:   #3b82f6;
+      --accent-teal:   #06b6d4;
+      --accent-green:  #10b981;
+      --accent-amber:  #f59e0b;
+      --accent-red:    #ef4444;
+      --accent-purple: #8b5cf6;
+      --text-primary:  #f0f4ff;
+      --text-secondary:#94a3b8;
+      --text-muted:    #64748b;
+      --radius:        12px;
+      --shadow:        0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 24px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 1000;
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
+    header p  { font-size: 0.75rem; color: var(--text-secondary); margin-top: 1px; }
+    .header-badge {
+      margin-left: auto;
+      background: rgba(59,130,246,0.15);
+      border: 1px solid rgba(59,130,246,0.35);
+      color: var(--accent-blue);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── MAIN LAYOUT ── */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 70px);
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 360px;
+      min-width: 340px;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .sidebar-section {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+
+    .section-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .step-badge {
+      width: 18px; height: 18px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      font-size: 0.65rem; font-weight: 700; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent-blue);
+      background: rgba(59,130,246,0.07);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-zone p { font-size: 0.8rem; color: var(--text-secondary); }
+    .upload-zone strong { color: var(--accent-blue); }
+    .file-selected {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--accent-green);
+    }
+
+    /* Instructions box */
+    .instruction-box {
+      background: rgba(59,130,246,0.08);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+    .instruction-box b { color: var(--accent-blue); }
+    .bbox-status {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      display: none;
+    }
+    .bbox-status.set {
+      display: block;
+      background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.3);
+      color: var(--accent-green);
+    }
+    .bbox-status.unset {
+      display: block;
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.3);
+      color: var(--accent-amber);
+    }
+
+    /* Buttons */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+      border: none; border-radius: var(--radius);
+      color: #fff; font-size: 0.9rem; font-weight: 600;
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(59,130,246,0.4);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.5); }
+    .btn-primary:active { transform: none; }
+    .btn-primary:disabled {
+      opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none;
+    }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary); font-size: 0.78rem; font-weight: 500;
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover { border-color: var(--border-hover); color: var(--text-primary); }
+    .btn-full { width: 100%; justify-content: center; }
+
+    /* Spinner */
+    .spinner-wrap {
+      display: none;
+      flex-direction: column; align-items: center; gap: 14px;
+      padding: 28px 0;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .spinner-wrap.active { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-box {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      color: #fca5a5;
+      margin-top: 10px;
+    }
+    .error-box.active { display: block; }
+
+    /* Results cards */
+    .results-area { display: none; }
+    .results-area.active { display: block; }
+
+    .result-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .result-card-title {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.07em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50; flex-shrink: 0;
+    }
+    .dot-blue  { background: var(--accent-blue); }
+    .dot-green { background: var(--accent-green); }
+    .dot-teal  { background: var(--accent-teal); }
+
+    .stat-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.8rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: var(--text-muted); }
+    .stat-value { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .stat-value.highlight { color: var(--accent-teal); font-size: 0.95rem; }
+    .stat-value.green { color: var(--accent-green); }
+    .stat-value.amber { color: var(--accent-amber); }
+
+    .volume-hero {
+      text-align: center;
+      padding: 10px 0 6px;
+    }
+    .volume-hero .vol-number {
+      font-size: 2rem; font-weight: 700;
+      background: linear-gradient(90deg, var(--accent-teal), var(--accent-blue));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .volume-hero .vol-unit { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+    .warning-box {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.77rem;
+      color: var(--accent-amber);
+      margin-top: 8px;
+    }
+
+    /* ── MAP ── */
+    #map {
+      flex: 1;
+      background: #1a2235;
+    }
+
+    /* Override Leaflet control styling for dark theme */
+    .leaflet-bar a {
+      background: var(--bg-card) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border) !important;
+    }
+    .leaflet-bar a:hover {
+      background: var(--bg-card2) !important;
+      color: var(--accent-blue) !important;
+    }
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-card) !important;
+      color: var(--text-primary) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 10px !important;
+      box-shadow: var(--shadow) !important;
+    }
+    .leaflet-popup-tip { background: var(--bg-card) !important; }
+
+    /* Map instruction overlay */
+    .map-hint {
+      position: absolute;
+      bottom: 18px; left: 50%; transform: translateX(-50%);
+      background: rgba(11,15,26,0.85);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 18px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      z-index: 900;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+    .map-wrap { position: relative; flex: 1; display: flex; }
+
+    /* Scrollbar */
+    .sidebar::-webkit-scrollbar { width: 5px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">🏞️</div>
+  <div>
+    <h1>AI Pond Planner</h1>
+    <p>Catchment Analysis &amp; Water Volume Estimation</p>
+  </div>
+  <span class="header-badge">CS559 Phase 3</span>
+</header>
+
+<div class="app-body">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+
+    <!-- STEP 1: Upload -->
+    <div class="sidebar-section">
+      <div class="section-label">
+        <span class="step-badge">1</span>
+        Upload Contour Map
+      </div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".kml,.kmz" />
+        <div class="upload-icon">🗺️</div>
+        <p><strong>Click or drag</strong> a KML/KMZ file here</p>
+        <p style="margin-top:4px; font-size:0.72rem; color:var(--text-muted)">Supports KML and KMZ contour maps</p>
+      </div>
+      <div class="file-selected" id="fileSelected" style="display:none">
+        ✅ <span id="fileName">No file selected</span>
+      </div>
+    </div>
+
+    <!-- STEP 2: Select Area -->
+    <div class="sidebar-section">
+      <div class="section-label">
+        <span class="step-badge">2</span>
+        Select Land Area on Map
+      </div>
+      <div class="instruction-box">
+        Use the <b>⬛ Draw Rectangle</b> tool in the top-left of the map to select your land area.<br/><br/>
+        Draw a box over the region you want to analyze. The analysis will be restricted to this area.
+        Leave undrawn to analyze the entire uploaded KML extent.
+      </div>
+      <div class="bbox-status" id="bboxStatus"></div>
+      <button class="btn-secondary btn-full" id="clearBboxBtn" style="margin-top:10px; display:none" onclick="clearBbox()">
+        🗑️ Clear Selection
+      </button>
+    </div>
+
+    <!-- STEP 3: Analyze -->
+    <div class="sidebar-section">
+      <div class="section-label">
+        <span class="step-badge">3</span>
+        Run Analysis
+      </div>
+      <button class="btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
+        <span>🔍</span> Analyze Catchment
+      </button>
+      <div class="spinner-wrap" id="spinner">
+        <div class="spinner"></div>
+        <span>Analyzing terrain & computing catchment…</span>
+      </div>
+      <div class="error-box" id="errorBox"></div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="sidebar-section results-area" id="resultsArea">
+
+      <!-- Pond Location -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <span class="dot dot-blue" style="border-radius:50%"></span>
+          Pond Location
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Latitude</span>
+          <span class="stat-value highlight" id="r-lat">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Longitude</span>
+          <span class="stat-value highlight" id="r-lon">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Elevation</span>
+          <span class="stat-value" id="r-elev">—</span>
+        </div>
+      </div>
+
+      <!-- Catchment Area -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <span class="dot dot-green" style="border-radius:50%"></span>
+          Catchment Area
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Area</span>
+          <span class="stat-value green" id="r-area-ha">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Area (m²)</span>
+          <span class="stat-value" id="r-area-m2">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Elevation Range</span>
+          <span class="stat-value" id="r-elev-range">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Relief</span>
+          <span class="stat-value" id="r-relief">—</span>
+        </div>
+      </div>
+
+      <!-- Water Volume (hero) -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <span class="dot dot-teal" style="border-radius:50%"></span>
+          Estimated Water Volume
+        </div>
+        <div class="volume-hero">
+          <div class="vol-number" id="r-vol-num">—</div>
+          <div class="vol-unit" id="r-vol-unit">million litres</div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Volume (m³)</span>
+          <span class="stat-value amber" id="r-vol-m3">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Avg. Pond Depth</span>
+          <span class="stat-value" id="r-depth">—</span>
+        </div>
+      </div>
+
+      <div class="warning-box" id="warningsBox" style="display:none"></div>
+
+      <button class="btn-secondary btn-full" style="margin-top:6px" onclick="resetResults()">
+        🔄 New Analysis
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ── MAP ── -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-hint" id="mapHint">Draw a rectangle to select land area, then upload a KML and click Analyze</div>
+  </div>
+
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<!-- Leaflet Draw JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
+
+<script>
+// ── STATE ──
+let selectedFile = null;
+let drawnBbox = null;  // [min_lon, min_lat, max_lon, max_lat]
+let pondMarker = null;
+let catchmentLayer = null;
+let drawnItems = null;
+
+// ── MAP INIT ──
+const map = L.map('map', {
+  center: [21.25, 81.29],
+  zoom: 13,
+  zoomControl: true,
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(map);
+
+// Draw control
+drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+const drawControl = new L.Control.Draw({
+  draw: {
+    rectangle: {
+      shapeOptions: {
+        color: '#3b82f6',
+        weight: 2,
+        fillOpacity: 0.08,
+      }
+    },
+    polygon: false, marker: false, circle: false,
+    circlemarker: false, polyline: false,
+  },
+  edit: { featureGroup: drawnItems },
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, (e) => {
+  // Only one bbox at a time
+  drawnItems.clearLayers();
+  drawnItems.addLayer(e.layer);
+
+  const bounds = e.layer.getBounds();
+  drawnBbox = [
+    bounds.getWest(), bounds.getSouth(),
+    bounds.getEast(), bounds.getNorth(),
+  ];
+  setBboxStatus(true);
+});
+
+map.on(L.Draw.Event.DELETED, () => {
+  drawnBbox = null;
+  setBboxStatus(false);
+});
+
+// ── FILE UPLOAD ──
+const fileInput = document.getElementById('fileInput');
+const uploadZone = document.getElementById('uploadZone');
+const fileSelected = document.getElementById('fileSelected');
+const fileName = document.getElementById('fileName');
+const analyzeBtn = document.getElementById('analyzeBtn');
+
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) setFile(f);
+});
+
+// Drag & drop
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault(); uploadZone.classList.add('drag-over');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+
+function setFile(f) {
+  selectedFile = f;
+  fileName.textContent = f.name;
+  fileSelected.style.display = 'flex';
+  analyzeBtn.disabled = false;
+  clearError();
+}
+
+// ── BBOX STATUS ──
+function setBboxStatus(isSet) {
+  const el = document.getElementById('bboxStatus');
+  const btn = document.getElementById('clearBboxBtn');
+  if (isSet) {
+    el.className = 'bbox-status set';
+    el.textContent = '✅ Map area selected — analysis will be clipped to drawn rectangle.';
+    btn.style.display = 'flex';
+    document.getElementById('mapHint').style.display = 'none';
+  } else {
+    el.className = 'bbox-status unset';
+    el.textContent = '⚠️ No area selected — full KML extent will be analyzed.';
+    btn.style.display = 'none';
+  }
+  el.style.display = 'block';
+}
+
+function clearBbox() {
+  drawnItems.clearLayers();
+  drawnBbox = null;
+  setBboxStatus(false);
+}
+
+// ── ANALYSIS ──
+async function runAnalysis() {
+  if (!selectedFile) return;
+
+  // Show spinner, hide results
+  document.getElementById('spinner').classList.add('active');
+  document.getElementById('resultsArea').classList.remove('active');
+  document.getElementById('errorBox').classList.remove('active');
+  analyzeBtn.disabled = true;
+  clearMapLayers();
+
+  const formData = new FormData();
+  formData.append('contour_map', selectedFile);
+
+  let url = '/analyzeContour';
+  const params = new URLSearchParams();
+  if (drawnBbox) {
+    params.set('bbox', drawnBbox.map(v => v.toFixed(6)).join(','));
+  }
+  if (params.toString()) url += '?' + params.toString();
+
+  try {
+    const resp = await fetch(url, { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      throw new Error(data.detail || `Server error ${resp.status}`);
+    }
+
+    renderResults(data);
+    renderMapLayers(data);
+
+  } catch (err) {
+    showError(err.message || 'Unknown error occurred. Check the server logs.');
+  } finally {
+    document.getElementById('spinner').classList.remove('active');
+    analyzeBtn.disabled = false;
+  }
+}
+
+// ── RENDER RESULTS ──
+function renderResults(d) {
+  const pl = d.pond_location;
+  const ca = d.catchment;
+  const wv = d.water_volume;
+
+  document.getElementById('r-lat').textContent  = pl.latitude.toFixed(6) + '°N';
+  document.getElementById('r-lon').textContent  = pl.longitude.toFixed(6) + '°E';
+  document.getElementById('r-elev').textContent = pl.elevation_m.toFixed(1) + ' m';
+
+  document.getElementById('r-area-ha').textContent   = ca.area_hectares.toFixed(3) + ' ha';
+  document.getElementById('r-area-m2').textContent   = ca.area_m2.toLocaleString() + ' m²';
+  const er = ca.elevation_range_m;
+  document.getElementById('r-elev-range').textContent = er[0].toFixed(1) + ' – ' + er[1].toFixed(1) + ' m';
+  document.getElementById('r-relief').textContent    = ca.relief_m.toFixed(1) + ' m';
+
+  const volMl = wv.estimated_volume_million_liters;
+  document.getElementById('r-vol-num').textContent  = volMl.toFixed(3);
+  document.getElementById('r-vol-unit').textContent = 'million litres';
+  document.getElementById('r-vol-m3').textContent   = wv.estimated_volume_m3.toLocaleString() + ' m³';
+  document.getElementById('r-depth').textContent    = wv.estimated_avg_depth_m.toFixed(2) + ' m';
+
+  const wb = document.getElementById('warningsBox');
+  if (d.warnings && d.warnings.length > 0) {
+    wb.style.display = 'block';
+    wb.textContent = '⚠️ ' + d.warnings.join(' | ');
+  } else {
+    wb.style.display = 'none';
+  }
+
+  document.getElementById('resultsArea').classList.add('active');
+}
+
+// ── RENDER MAP LAYERS ──
+function renderMapLayers(d) {
+  const pl = d.pond_location;
+  const ca = d.catchment;
+
+  // Pond marker
+  const pondIcon = L.divIcon({
+    html: `<div style="
+      width:28px; height:28px;
+      background:linear-gradient(135deg,#3b82f6,#06b6d4);
+      border: 3px solid #fff;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 10px rgba(59,130,246,0.6);
+    "></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    className: '',
+  });
+
+  pondMarker = L.marker([pl.latitude, pl.longitude], { icon: pondIcon })
+    .addTo(map)
+    .bindPopup(`
+      <div style="min-width:180px">
+        <div style="font-weight:700; font-size:0.9rem; margin-bottom:6px; color:#3b82f6">🔵 Pond Location</div>
+        <div style="font-size:0.8rem; line-height:1.6">
+          <b>Lat:</b> ${pl.latitude.toFixed(6)}°N<br>
+          <b>Lon:</b> ${pl.longitude.toFixed(6)}°E<br>
+          <b>Elevation:</b> ${pl.elevation_m.toFixed(1)} m
+        </div>
+      </div>
+    `, { maxWidth: 240 })
+    .openPopup();
+
+  // Catchment polygon
+  const ring = ca.boundary_polygon && ca.boundary_polygon.coordinates && ca.boundary_polygon.coordinates[0];
+  if (ring && ring.length > 2) {
+    const latlngs = ring.map(([lon, lat]) => [lat, lon]);
+    catchmentLayer = L.polygon(latlngs, {
+      color: '#10b981',
+      weight: 2,
+      fillColor: '#10b981',
+      fillOpacity: 0.18,
+    }).addTo(map).bindPopup(`
+      <div>
+        <div style="font-weight:700; font-size:0.9rem; margin-bottom:6px; color:#10b981">🟢 Catchment Area</div>
+        <div style="font-size:0.8rem; line-height:1.6">
+          <b>Area:</b> ${ca.area_hectares.toFixed(3)} ha<br>
+          <b>Relief:</b> ${ca.relief_m.toFixed(1)} m<br>
+          <b>Est. Volume:</b> ${d.water_volume.estimated_volume_m3.toLocaleString()} m³
+        </div>
+      </div>
+    `, { maxWidth: 220 });
+
+    // Fit map to catchment bounds
+    const bounds = catchmentLayer.getBounds();
+    map.fitBounds(bounds, { padding: [40, 40] });
+  } else {
+    // Just pan to pond
+    map.setView([pl.latitude, pl.longitude], 14);
+  }
+}
+
+function clearMapLayers() {
+  if (pondMarker) { map.removeLayer(pondMarker); pondMarker = null; }
+  if (catchmentLayer) { map.removeLayer(catchmentLayer); catchmentLayer = null; }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = '❌ ' + msg;
+  el.classList.add('active');
+}
+
+function clearError() {
+  document.getElementById('errorBox').classList.remove('active');
+}
+
+function resetResults() {
+  clearMapLayers();
+  clearBbox();
+  drawnItems.clearLayers();
+  selectedFile = null;
+  fileInput.value = '';
+  fileSelected.style.display = 'none';
+  analyzeBtn.disabled = true;
+  document.getElementById('resultsArea').classList.remove('active');
+  document.getElementById('bboxStatus').style.display = 'none';
+  document.getElementById('clearBboxBtn').style.display = 'none';
+  document.getElementById('mapHint').style.display = 'block';
+  clearError();
+}
+</script>
+</body>
+</html>
