@@ -407,27 +407,39 @@ code.font.name = "Courier New"
 code.font.size = Pt(9)
 set_para_spacing(p, before=2, after=8)
 
-heading(doc, "7.2 Server Deployment (SSH)", level=2)
-body(doc, "To deploy on the lab server and keep running after SSH logout:")
+heading(doc, "7.2 Server Deployment (SSH & Port Forwarding)", level=2)
+body(doc,
+    "The system is deployed on the course lab server (student@10.1.75.51:2310). "
+    "The application process is executed in the background bound to 0.0.0.0 on port 4000. "
+    "The server's automated port-forwarding infrastructure maps internal port 4000 to "
+    "public port 4310 (offset +310), making the live application accessible externally "
+    "at http://10.1.75.51:4310/."
+)
 p = doc.add_paragraph()
+p.style = doc.styles["Normal"]
 code = p.add_run(
-    "nohup venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 4310 > app.log 2>&1 &"
+    "# 1. SSH into the lab server:\n"
+    "ssh -p 2310 student@10.1.75.51\n\n"
+    "# 2. Navigate to project directory and launch Uvicorn on 0.0.0.0:4000:\n"
+    "cd /home/student/AI-POND-PLANNER\n"
+    "nohup ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 4000 > app.log 2>&1 </dev/null &\n\n"
+    "# 3. Process runs bound to 0.0.0.0:4000 -> Auto-forwarded to http://10.1.75.51:4310/"
 )
 code.font.name = "Courier New"
 code.font.size = Pt(9)
 set_para_spacing(p, before=2, after=8)
 
-heading(doc, "7.3 Access URLs", level=2)
+heading(doc, "7.3 Access URLs and Endpoints", level=2)
 add_table(doc,
-    ["URL", "Purpose"],
+    ["URL", "Internal Port", "Forwarded Port", "Purpose"],
     [
-        ["http://10.1.75.51:4310/",              "Interactive frontend map"],
-        ["http://10.1.75.51:4310/health",        "Liveness check"],
-        ["http://10.1.75.51:4310/analyzeContour","Main analysis API endpoint"],
-        ["http://10.1.75.51:4310/findCatchment", "Alias endpoint"],
-        ["http://10.1.75.51:4310/docs",          "Swagger UI interactive documentation"],
+        ["http://10.1.75.51:4310/",              "4000", "4310", "Interactive frontend map UI"],
+        ["http://10.1.75.51:4310/health",        "4000", "4310", "Liveness check endpoint"],
+        ["http://10.1.75.51:4310/analyzeContour","4000", "4310", "Main analysis API endpoint"],
+        ["http://10.1.75.51:4310/findCatchment", "4000", "4310", "Alias analysis endpoint"],
+        ["http://10.1.75.51:4310/docs",          "4000", "4310", "Swagger UI documentation"],
     ],
-    col_widths=[Inches(3.0), Inches(3.2)]
+    col_widths=[Inches(2.5), Inches(0.9), Inches(1.0), Inches(1.8)]
 )
 
 # ── 8. VISUALIZATION ───────────────────────────────────────────────────────
@@ -464,14 +476,103 @@ body(doc,
 body(doc,
     "The system is designed for robustness on memory-constrained servers: the D8 hydrological "
     "algorithm runs entirely in NumPy without heavy GIS dependencies, and all grid sizes are "
-    "capped to prevent out-of-memory crashes. The five free map tile layers (CartoDB, OSM, "
-    "ESRI Satellite, OpenTopoMap, CartoDB Dark) require no API keys and work on the campus LAN."
+    "capped to prevent out-of-memory crashes. The five map tile layers (OSM, OpenTopoMap, "
+    "ESRI Satellite, ESRI Street Map, OSM HOT) require no API keys and work on the campus LAN."
 )
 body(doc,
     "The 11 automated integration tests ensure correctness of all Phase 3 features and "
     "provide a regression safety net for future changes. The system is ready for VIVA "
     "demonstration via the live URL and the GitHub repository."
 )
+
+# ── SECTION: APIs & External Services Used ──
+
+doc.add_paragraph()
+heading(doc, "10. APIs and External Services Used")
+body(doc,
+    "The system uses only freely available, no-API-key services. No paid external API "
+    "is required. All services below are accessed via standard HTTP from the client browser."
+)
+
+heading(doc, "10.1 Map Tile APIs (Frontend)", level=2)
+add_table(doc,
+    ["Service", "Provider", "API Key?", "Usage in Project"],
+    [
+        ["OpenStreetMap Tiles",
+         "OpenStreetMap Foundation",
+         "None",
+         "Default base map — full global coverage at all zoom levels"],
+        ["OSM Humanitarian (HOT)",
+         "Humanitarian OpenStreetMap Team",
+         "None",
+         "Colorful alternative base map with highlighted roads"],
+        ["OpenTopoMap Tiles",
+         "OpenTopoMap (community)",
+         "None",
+         "Terrain/contour base map — useful for elevation context, zoom ≤17"],
+        ["ESRI World Imagery",
+         "Esri ArcGIS Online",
+         "None",
+         "Satellite imagery base map — site verification, zoom ≤18"],
+        ["ESRI World Street Map",
+         "Esri ArcGIS Online",
+         "None",
+         "Detailed street map — urban areas, zoom ≤16"],
+    ],
+    col_widths=[Inches(1.5), Inches(1.5), Inches(0.8), Inches(2.4)]
+)
+
+heading(doc, "10.2 JavaScript Libraries (Frontend, CDN)", level=2)
+add_table(doc,
+    ["Library", "Version", "Source", "Usage"],
+    [
+        ["Leaflet.js",
+         "1.9.4",
+         "unpkg.com CDN",
+         "Interactive map rendering, marker/polygon overlays, zoom/pan"],
+        ["Leaflet.draw",
+         "1.0.4",
+         "cdnjs CDN",
+         "Rectangle draw tool for land area selection on map"],
+        ["Google Fonts (Inter)",
+         "—",
+         "fonts.googleapis.com",
+         "UI typography — Inter font family for sidebar and headers"],
+    ],
+    col_widths=[Inches(1.4), Inches(0.7), Inches(1.5), Inches(2.6)]
+)
+
+heading(doc, "10.3 Python Backend Libraries", level=2)
+add_table(doc,
+    ["Library", "Version", "Purpose"],
+    [
+        ["FastAPI",       "0.141",  "REST API framework — routes, request validation, static file serving"],
+        ["Uvicorn",       "latest", "ASGI server — production HTTP server for FastAPI"],
+        ["NumPy",         "latest", "DEM grid construction, D8 flow direction and accumulation arrays"],
+        ["SciPy",         "latest", "RBF interpolation for scattered contour points to regular DEM grid"],
+        ["scikit-image",  "latest", "Marching squares algorithm for catchment boundary polygon tracing"],
+        ["lxml",          "latest", "KML/KMZ XML parsing with namespace support"],
+        ["python-multipart","latest","File upload handling for KML/KMZ contour map files"],
+        ["pyproj",        "latest", "Coordinate projection — geographic to Cartesian (metres) for DEM"],
+        ["python-docx",   "latest", "DOCX report generation script"],
+    ],
+    col_widths=[Inches(1.5), Inches(0.7), Inches(4.0)]
+)
+
+heading(doc, "10.4 API Endpoints Provided (Backend)", level=2)
+add_table(doc,
+    ["Endpoint", "Method", "Description"],
+    [
+        ["GET  /",              "GET",  "Serves interactive frontend HTML page"],
+        ["GET  /health",        "GET",  "Liveness check — returns {status: ok}"],
+        ["POST /analyzeContour","POST", "Main analysis endpoint — accepts KML/KMZ, returns pond + catchment + volume"],
+        ["POST /findCatchment", "POST", "Alias for /analyzeContour"],
+        ["GET  /docs",          "GET",  "Swagger UI — interactive API documentation"],
+        ["GET  /redoc",         "GET",  "ReDoc — alternative API documentation viewer"],
+    ],
+    col_widths=[Inches(1.8), Inches(0.7), Inches(3.7)]
+)
+
 
 # ── APPENDIX ───────────────────────────────────────────────────────────────
 
@@ -510,17 +611,59 @@ r.font.name = "Courier New"
 r.font.size = Pt(8)
 set_para_spacing(p)
 
-heading(doc, "Appendix B: AI Assistance Acknowledgement", level=1)
+heading(doc, "Appendix B: AI Tools Used and Citation", level=1)
 body(doc,
-    "During the development of this project, Google Gemini (Antigravity AI Coding Assistant) "
-    "was used as a pair-programming tool to assist with: code structure and refactoring "
-    "suggestions, debugging of the D8 flow-routing algorithm, generation of the FastAPI "
-    "endpoint boilerplate, Leaflet.js frontend integration, and report formatting. "
-    "All algorithmic design decisions, system architecture choices, and analytical "
-    "interpretations were made by the student. The AI was used as a productivity tool "
-    "similar to consulting documentation or Stack Overflow."
+    "In accordance with the course's AI use policy, the following AI tools were used "
+    "during the development of this project. All usage was limited to coding assistance "
+    "and productivity support."
+)
+
+add_table(doc,
+    ["AI Tool", "Provider", "Version / Access Date", "Scope of Use"],
+    [
+        ["Google Gemini\n(Antigravity AI Coding Assistant)",
+         "Google DeepMind",
+         "Antigravity v1.0\nSep 2025",
+         "Pair-programming: D8 algorithm debugging, FastAPI boilerplate generation, "
+         "Leaflet.js frontend integration, KML client-side parser, report structure"],
+        ["GitHub Copilot", "Microsoft / OpenAI", "Not used", "—"],
+        ["ChatGPT / OpenAI", "OpenAI", "Not used", "—"],
+    ],
+    col_widths=[Inches(1.6), Inches(1.2), Inches(1.3), Inches(2.1)]
+)
+
+doc.add_paragraph()
+body(doc, "Formal Citation (APA 7th Edition):")
+p = doc.add_paragraph()
+run = p.add_run(
+    "Google DeepMind. (2025). Gemini — Antigravity AI Coding Assistant "
+    "[Large language model AI pair-programming tool]. "
+    "Used for coding assistance during development of CS559 Assignment 1 (Phases 1–3). "
+    "https://deepmind.google/technologies/gemini/"
+)
+run.font.size = Pt(9)
+run.font.italic = True
+set_para_spacing(p, before=2, after=8)
+
+body(doc,
+    "Detailed scope of AI assistance:"
+)
+bullet(doc, "D8 flow direction and accumulation algorithm — AI suggested the NumPy-based "
+            "vectorised traversal approach; student designed the pour-point scoring formula.")
+bullet(doc, "FastAPI endpoint boilerplate — AI generated the initial route skeleton; "
+            "student added Pydantic models, validation, and bbox parameter logic.")
+bullet(doc, "Leaflet.js frontend — AI assisted with the map layer switcher and draw "
+            "toolbar CSS fixes; student designed the overall 3-step UX and KML "
+            "client-side bounds parser logic.")
+bullet(doc, "Report formatting — AI generated DOCX structure using python-docx; "
+            "all technical content and analysis written by student.")
+body(doc,
+    "All submitted code has been reviewed, understood, and tested by the student. "
+    "The AI did not independently execute code, access the project server, or make "
+    "design decisions. Final responsibility for all outputs lies with the student."
 )
 
 # ── SAVE ───────────────────────────────────────────────────────────────────
 doc.save(OUT_FILE)
 print(f"✅ Report saved: {OUT_FILE}")
+
