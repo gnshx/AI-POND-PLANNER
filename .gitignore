@@ -1,8 +1,28 @@
+# Python
 venv/
 __pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs & runtime artifacts
+app.log
+*.log
+nohup.out
+
+# Large KML/KMZ data files — too big for git
 *.kml
+*.kmz
+
+# Generated reports — submit via Google Classroom, not git
 *.docx
 *.pdf
+
+# Secrets / env
+.env
+credentials.json
+token.json
