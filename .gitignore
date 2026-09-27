@@ -21,6 +21,8 @@ nohup.out
 # Generated reports — submit via Google Classroom, not git
 *.docx
 *.pdf
+scripts/generate_*.py
+.~lock.*
 
 # Secrets / env
 .env
