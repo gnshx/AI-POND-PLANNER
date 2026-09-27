@@ -262,11 +262,11 @@
     <!-- Layer switcher -->
     <div class="layer-btn">
       <div style="font-size:.58rem;color:var(--t3);text-align:center;margin-bottom:3px;font-weight:600">🗺️ Map Style<br><span style='font-size:.55rem;color:#10b981'>✓ All free, no API key</span></div>
-      <button class="lb active" id="lb-streets"   onclick="setLayer('streets')">🎨 Streets (ESRI)</button>
-      <button class="lb"        id="lb-osm"       onclick="setLayer('osm')">🗺️ OpenStreetMap</button>
+      <button class="lb active" id="lb-osm"       onclick="setLayer('osm')">🗺️ OpenStreetMap</button>
+      <button class="lb"        id="lb-hot"       onclick="setLayer('hot')">🎨 OSM Colorful (HOT)</button>
       <button class="lb"        id="lb-topo"      onclick="setLayer('topo')">⛰️ Topo / Terrain</button>
       <button class="lb"        id="lb-satellite" onclick="setLayer('satellite')">🛰️ Satellite (ESRI)</button>
-      <button class="lb"        id="lb-natgeo"    onclick="setLayer('natgeo')">🌿 NatGeo (ESRI)</button>
+      <button class="lb"        id="lb-streets"   onclick="setLayer('streets')">🏙️ ESRI Streets</button>
     </div>
   </div>
 
@@ -275,38 +275,43 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
 <script>
-// ── TILE LAYERS — all 100% FREE, no API key required ──
-// CartoDB now requires API key — replaced with ESRI (always free, no key)
+// ── TILE LAYERS — all FREE, no API key ──
+// Note: ESRI layers show "Map data not available" at high zoom — use OSM for detailed view
 const TILES = {
-  streets: {
-    // ESRI World Street Map — colorful, detailed streets. Free, no key.
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    attr: '© <a href="https://www.esri.com">Esri</a>, HERE, Garmin, OpenStreetMap contributors',
-    subdomains: '',
-  },
   osm: {
-    // OpenStreetMap standard. Free, no key.
+    // OpenStreetMap — global coverage, always works. Free, no key.
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attr: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     subdomains: 'abc',
+    maxZoom: 19,
+  },
+  hot: {
+    // OSM Humanitarian (HOT) — colorful, orange roads. Free, no key.
+    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    attr: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, HOT',
+    subdomains: 'abc',
+    maxZoom: 19,
   },
   topo: {
     // OpenTopoMap — terrain contours. Free, no key.
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attr: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://opentopomap.org">OpenTopoMap</a>',
     subdomains: 'abc',
+    maxZoom: 17,
   },
   satellite: {
-    // ESRI World Imagery (Satellite). Free, no key.
+    // ESRI World Imagery (Satellite). Free, no key. Works up to zoom 18.
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attr: '© <a href="https://www.esri.com">Esri</a> World Imagery',
     subdomains: '',
+    maxZoom: 18,
   },
-  natgeo: {
-    // ESRI NatGeo World Map — natural terrain colours. Free, no key.
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',
-    attr: '© <a href="https://www.esri.com">Esri</a>, National Geographic',
+  streets: {
+    // ESRI World Street Map. Free, no key. May show "no data" at high zoom in rural India.
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attr: '© <a href="https://www.esri.com">Esri</a>, HERE, Garmin, OpenStreetMap',
     subdomains: '',
+    maxZoom: 16,
   },
 };
 
@@ -316,13 +321,13 @@ const map = L.map('map', { center: [22, 80], zoom: 5, zoomControl: true });
 function setLayer(name) {
   if (currentTileLayer) map.removeLayer(currentTileLayer);
   const t = TILES[name];
-  const opts = { attribution: t.attr, maxZoom: 19 };
+  const opts = { attribution: t.attr, maxZoom: t.maxZoom || 19 };
   if (t.subdomains) opts.subdomains = t.subdomains;
   currentTileLayer = L.tileLayer(t.url, opts).addTo(map);
   document.querySelectorAll('.lb').forEach(b => b.classList.remove('active'));
   document.getElementById('lb-' + name)?.classList.add('active');
 }
-setLayer('streets'); // default = CartoDB Voyager, colorful, free
+setLayer('osm'); // default = OSM, guaranteed global coverage including India
 
 // ── DRAW CONTROL ──
 const drawnItems = new L.FeatureGroup().addTo(map);
